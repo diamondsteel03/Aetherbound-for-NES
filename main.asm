@@ -166,3 +166,10 @@ InitPPU:
 .word 0
 .word 0
 .word 0
+
+; =========================
+; CHR GRAPHICS DATA
+; =========================
+
+.segment "CHARS"
+.incbin "chr.chr"
