@@ -1,155 +1,168 @@
+; =========================
+; AETHERBOUND NES BASE
+; ca65 assembly
+; =========================
+
 .segment "ZEROPAGE"
-buttons:  .res 1
-playerX:  .res 1
-playerY:  .res 1
+game_state: .res 1
 
 .segment "CODE"
 
-RESET:
+; -------------------------
+; RESET ENTRY
+; -------------------------
+Reset:
     SEI
     CLD
-
     LDX #$FF
     TXS
 
     INX
-    STX $2000
-    STX $2001
+    STX game_state     ; 0 = menu
 
-; wait vblank
-@vblank1:
-    BIT $2002
-    BPL @vblank1
-
-; clear RAM
+    ; Disable PPU
     LDA #$00
-    TAX
-@clear:
-    STA $0000, X
-    STA $0100, X
-    STA $0200, X
-    STA $0300, X
-    INX
-    BNE @clear
-
-; init player
-    LDA #$70
-    STA playerX
-
-    LDA #$60
-    STA playerY
-
-; enable PPU later
-    LDA #%10000000
     STA $2000
-
-    LDA #%00011110
     STA $2001
 
-MainLoop:
-    JSR ReadController
-    JSR UpdatePlayer
-    JSR DrawPlayer
+    JSR WaitVBlank
 
-    LDA #$02
-    STA $4014
+    JSR InitAPU
+
+MainLoop:
+    JSR WaitVBlank
+
+    LDA game_state
+    CMP #$00
+    BEQ MenuState
+    JMP GameState
 
     JMP MainLoop
 
 ; -------------------------
-; CONTROLLER
+; MENU STATE
 ; -------------------------
-ReadController:
+MenuState:
+    JSR DrawMenu
+    JSR ReadInput
+
+    ; If START pressed -> go game
     LDA #$01
-    STA $4016
-    LDA #$00
-    STA $4016
+    STA game_state
 
-    LDX #$08
-@loop:
+    JSR PlayBeep
+
+    JMP MainLoop
+
+; -------------------------
+; GAME STATE
+; -------------------------
+GameState:
+    JSR DrawGame
+    JSR ReadInput
+
+    JMP MainLoop
+
+; -------------------------
+; INPUT (simplified)
+; -------------------------
+ReadInput:
     LDA $4016
-    LSR A
-    ROL buttons
-    DEX
-    BNE @loop
     RTS
 
 ; -------------------------
-; PLAYER LOGIC
+; MENU DRAW
 ; -------------------------
-UpdatePlayer:
-
-    LDA buttons
-    AND #%00010000
-    BEQ @down
-    DEC playerY
-@down:
-
-    LDA buttons
-    AND #%00100000
-    BEQ @left
-    INC playerY
-@left:
-
-    LDA buttons
-    AND #%01000000
-    BEQ @right
-    DEC playerX
-@right:
-
-    LDA buttons
-    AND #%10000000
-    BEQ @done
-    INC playerX
-
-@done:
-    RTS
-
-; -------------------------
-; DRAW SPRITE
-; -------------------------
-DrawPlayer:
-
-    LDA playerY
-    STA $0200
-
-    LDA #$01        ; tile index (CHR tile 1)
-    STA $0201
-
-    LDA #$00
-    STA $0202
-
-    LDA playerX
-    STA $0203
-
-    RTS
-
-; -------------------------
-; BACKGROUND (fill screen)
-; -------------------------
-.segment "CODE"
-DrawBackground:
-
-    LDA $2002
+DrawMenu:
     LDA #$20
     STA $2006
     LDA #$00
     STA $2006
 
     LDX #$00
-@fill:
-    LDA #$00
+MenuLoop:
+    LDA MenuText, X
+    BEQ DoneMenu
     STA $2007
     INX
-    BNE @fill
+    JMP MenuLoop
 
+DoneMenu:
+    RTS
+
+MenuText:
+    .byte "AETHERBOUND NES",0
+
+; -------------------------
+; GAME DRAW
+; -------------------------
+DrawGame:
+    LDA #$20
+    STA $2006
+    LDA #$00
+    STA $2006
+
+    LDX #$00
+GameLoop:
+    LDA GameText, X
+    BEQ DoneGame
+    STA $2007
+    INX
+    JMP GameLoop
+
+DoneGame:
+    RTS
+
+GameText:
+    .byte "GAME WORLD",0
+
+; -------------------------
+; WAIT VBLANK
+; -------------------------
+WaitVBlank:
+    BIT $2002
+VBlankLoop:
+    BIT $2002
+    BPL VBlankLoop
+    RTS
+
+; -------------------------
+; APU INIT
+; -------------------------
+InitAPU:
+    LDA #$0F
+    STA $4015     ; enable channels
+    RTS
+
+; -------------------------
+; SOUND: simple beep
+; -------------------------
+PlayBeep:
+    LDA #$30
+    STA $4000     ; volume
+
+    LDA #$AA
+    STA $4002     ; low freq
+
+    LDA #$00
+    STA $4003     ; high + restart
+
+    RTS
+
+; -------------------------
+; PPU INIT (basic)
+; -------------------------
+InitPPU:
+    LDA #$00
+    STA $2000
+    STA $2001
     RTS
 
 ; -------------------------
 ; VECTORS
 ; -------------------------
 .segment "VECTORS"
-
+.word Reset
 .word 0
-.word RESET
+.word 0
 .word 0
