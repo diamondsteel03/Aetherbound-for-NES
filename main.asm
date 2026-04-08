@@ -3,6 +3,14 @@
 ; ca65 assembly
 ; =========================
 
+.segment "HEADER"
+.byte "NES", $1A     ; iNES magic
+.byte 1              ; 1 x 16KB PRG
+.byte 1              ; 1 x 8KB CHR
+.byte $00            ; mapper 0
+.byte $00
+.byte $00, $00, $00, $00, $00, $00, $00, $00
+
 .segment "ZEROPAGE"
 game_state: .res 1
 
